@@ -23,7 +23,7 @@ namespace DiscordBot
 
             var localInfo = await localInfoHandler.LoadLocalInfoAsync();
 
-            var httpClient = new DiscordHttpClient(localInfo.Token);
+            var httpClient = new DiscordHttpClient(localInfo.Secret);
 
             var gatewayUrl = localInfo.GatewayUrl;
 
@@ -36,7 +36,7 @@ namespace DiscordBot
 
             var gatewayUri = new Uri($"{gatewayUrl}?v=8&encoding=json");
 
-            var socket = new DiscordSocket();
+            var socket = new DiscordSocket(localInfo.Token);
 
             await socket.ConnectAsync(gatewayUri,
                                       cancellationTokenSource.Token);

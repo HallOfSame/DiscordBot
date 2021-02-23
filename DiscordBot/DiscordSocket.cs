@@ -19,9 +19,9 @@ namespace DiscordBot
 {
     public class DiscordSocket : IDisposable
     {
-        private readonly string clientToken;
-
         #region Fields
+
+        private readonly string clientToken;
 
         private readonly BufferBlock<string> receivedMessageBlock;
 
@@ -59,7 +59,9 @@ namespace DiscordBot
             new TaskWrapper(() => CheckForNewMessages(cancellationToken)).Start();
             new TaskWrapper(() => ProcessReceivedMessages(cancellationToken)).Start();
             new TaskWrapper(() => SendMessagesTask(cancellationToken)).Start();
+
 #pragma warning restore 4014
+            SendIdentify();
         }
 
         public void Dispose()
@@ -79,6 +81,12 @@ namespace DiscordBot
             {
                 var receiveResult = await webSocket.ReceiveAsync(new ArraySegment<byte>(bufferArray, 0, BufferSize), cancellationToken);
 
+                if (receiveResult.MessageType == WebSocketMessageType.Close)
+                {
+                    Debug.Write($"Discord closed socket. {receiveResult.CloseStatus}. {receiveResult.CloseStatusDescription}.");
+                    return;
+                }
+
                 var newBytes = new ArraySegment<byte>(bufferArray, 0, receiveResult.Count);
 
                 receivedMessage += Encoding.UTF8.GetString(newBytes.ToArray());
@@ -94,11 +102,6 @@ namespace DiscordBot
 
                 receivedMessage = string.Empty;
             }
-        }
-
-        private void SendIdentify()
-        {
-
         }
 
         private async Task HeartbeatTask(int interval,
@@ -121,7 +124,7 @@ namespace DiscordBot
 
                 // Wait interval
                 await Task.Delay(heartbeatTimespan);
-                
+
                 // Check for ack
                 if (heartbeatAckReceived)
                 {
@@ -144,6 +147,9 @@ namespace DiscordBot
 
                 switch (decodedMessage.OpCode)
                 {
+                    case OpCode.GatewayDispatch:
+                        Debug.WriteLine($"Gateway dispatch: {newMessage}.");
+                        break;
                     case OpCode.Hello:
                         var helloPayload = ((JToken)decodedMessage.Data).ToObject<HelloPayload>();
 #pragma warning disable 4014
@@ -159,6 +165,40 @@ namespace DiscordBot
                         break;
                 }
             }
+        }
+
+        private void SendIdentify()
+        {
+            var payload = new IdentifyPayload
+                          {
+                              Token = clientToken,
+                              Intents = (int)(Intents.Guilds | Intents.GuildMessages),
+                              Compress = false,
+                              GuildSubscriptions = false,
+                              Shard = null,
+                              LargeThreshold = 50,
+                              ConnectionProperties = new IdentifyPayload.ConnectionPropertiesClass
+                                                     {
+                                                         Os = "windows",
+                                                         Browser = "DiscordBot",
+                                                         Device = "DiscordBot"
+                                                     },
+                              Presence = new UpdateStatusPayload
+                                         {
+                                             Activities = new object[0],
+                                             Since = null,
+                                             Afk = false,
+                                             Status = Status.Online
+                                         }
+                          };
+
+            var identifyString = JsonConvert.SerializeObject(new GatewayPayload
+                                                             {
+                                                                 Data = payload,
+                                                                 OpCode = OpCode.Identify
+                                                             });
+
+            sendMessageBlock.Post(identifyString);
         }
 
         private async Task SendMessagesTask(CancellationToken cancellationToken)
