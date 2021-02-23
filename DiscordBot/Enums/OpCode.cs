@@ -4,6 +4,10 @@
     {
         GatewayDispatch = 0,
 
-        Hello = 10
+        Heartbeat = 1,
+
+        Hello = 10,
+
+        HeartbeatAck = 11
     }
 }
