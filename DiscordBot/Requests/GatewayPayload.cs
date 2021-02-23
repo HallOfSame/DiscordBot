@@ -27,6 +27,6 @@ namespace DiscordBot.Requests
         [JsonProperty("s", NullValueHandling = NullValueHandling.Ignore)]
         public int? SequenceNumber { get; set; }
 
-        #endregion
+        #endregion/
     }
 }
